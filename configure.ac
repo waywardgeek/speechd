@@ -181,6 +181,21 @@ AC_SUBST([ESPEAK_NG_CFLAGS])
 AC_SUBST([ESPEAK_NG_LIBS])
 AS_IF([test $with_espeak_ng = "yes"], [output_modules="${output_modules} espeak-ng"])
 
+# check for espeak support
+AC_ARG_WITH([speechsw],
+	[AS_HELP_STRING([--with-speechsw], [Compile with Speech Switch support])],
+	[],
+	[with_speechsw=check])
+AS_IF([test $with_speechsw != "no"],
+	[PKG_CHECK_MODULES([SPEECHSW], [speechsw],
+		[with_speechsw="yes"],
+		[AS_IF([test $with_speechsw = "yes"],
+			[AC_MSG_FAILURE([Speech Switch is not available])])])])
+AM_CONDITIONAL([speechsw_support], [test $with_speechsw = "yes"])
+AC_SUBST([SPEECHSW_CFLAGS])
+AC_SUBST([SPEECHSW_LIBS])
+AS_IF([test $with_speechsw = "yes"], [output_modules="${output_modules} speechsw"])
+
 # check for flite support
 AC_ARG_WITH([flite],
 	[AS_HELP_STRING([--with-flite], [include Festival Lite (Flite) support])],

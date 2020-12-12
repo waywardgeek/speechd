@@ -112,6 +112,15 @@ sd_espeak_ng_LDADD = $(top_builddir)/src/common/libcommon.la \
 	$(common_LDADD)
 endif
 
+if speechsw_support
+modulebin_PROGRAMS += sd_speechsw
+sd_speechsw_SOURCES = speechsw.c $(audio_SOURCES) $(common_SOURCES) module_utils_speak_queue.c
+sd_espeak_LDADD = $(top_builddir)/src/common/libcommon.la \
+	$(audio_dlopen_modules) \
+	$(SPEECHSW_LIBS)
+	$(common_LDADD)
+endif
+
 if ivona_support
 modulebin_PROGRAMS += sd_ivona
 sd_ivona_SOURCES = ivona.c ivona_client.c ivona_client.h $(audio_SOURCES) \
