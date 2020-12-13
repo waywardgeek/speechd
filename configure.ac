@@ -181,7 +181,7 @@ AC_SUBST([ESPEAK_NG_CFLAGS])
 AC_SUBST([ESPEAK_NG_LIBS])
 AS_IF([test $with_espeak_ng = "yes"], [output_modules="${output_modules} espeak-ng"])
 
-# check for espeak support
+# check for Speech Switch support
 AC_ARG_WITH([speechsw],
 	[AS_HELP_STRING([--with-speechsw], [Compile with Speech Switch support])],
 	[],
