@@ -188,10 +188,11 @@ AC_ARG_WITH([speechsw],
 	[with_speechsw=check])
 AS_IF([test $with_speechsw != "no"],
 	AC_CHECK_LIB([speechsw], [swSpeak],
-		[speechsw_basic="-lspeechsw"],
+		[with_speechsw=yes;
+		speechsw_basic="-lspeechsw"],
 		[AS_IF([test $with_speechsw = "yes"],
 			[AC_MSG_FAILURE([libspeechsw is not available])])],
-		[-lm]))
+		[]))
 AM_CONDITIONAL([speechsw_support], [test $with_speechsw = "yes"])
 AC_SUBST([SPEECHSW_CFLAGS])
 AC_SUBST([SPEECHSW_LIBS])
