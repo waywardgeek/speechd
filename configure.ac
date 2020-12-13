@@ -187,10 +187,11 @@ AC_ARG_WITH([speechsw],
 	[],
 	[with_speechsw=check])
 AS_IF([test $with_speechsw != "no"],
-	[PKG_CHECK_MODULES([SPEECHSW], [speechsw],
-		[with_speechsw="yes"],
+	AC_CHECK_LIB([speechsw], [swSpeak],
+		[speechsw_basic="-lspeechsw"],
 		[AS_IF([test $with_speechsw = "yes"],
-			[AC_MSG_FAILURE([Speech Switch is not available])])])])
+			[AC_MSG_FAILURE([libspeechsw is not available])])],
+		[-lm]))
 AM_CONDITIONAL([speechsw_support], [test $with_speechsw = "yes"])
 AC_SUBST([SPEECHSW_CFLAGS])
 AC_SUBST([SPEECHSW_LIBS])

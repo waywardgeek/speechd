@@ -35,9 +35,6 @@
 #include <speechsw/speechsw.h>
 #include <speechsw/util.h>
 
-/* Sonic header file. */
-#include <speechsw/sonic.h>
-
 /* Speech Dispatcher includes. */
 #include "spd_audio.h"
 #include <speechd_types.h>
