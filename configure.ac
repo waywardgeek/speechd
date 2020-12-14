@@ -181,23 +181,6 @@ AC_SUBST([ESPEAK_NG_CFLAGS])
 AC_SUBST([ESPEAK_NG_LIBS])
 AS_IF([test $with_espeak_ng = "yes"], [output_modules="${output_modules} espeak-ng"])
 
-# check for Speech Switch support
-AC_ARG_WITH([speechsw],
-	[AS_HELP_STRING([--with-speechsw], [Compile with Speech Switch support])],
-	[],
-	[with_speechsw=check])
-AS_IF([test $with_speechsw != "no"],
-	AC_CHECK_LIB([speechsw], [swSpeak],
-		[with_speechsw=yes;
-		speechsw_basic="-lspeechsw"],
-		[AS_IF([test $with_speechsw = "yes"],
-			[AC_MSG_FAILURE([libspeechsw is not available])])],
-		[]))
-AM_CONDITIONAL([speechsw_support], [test $with_speechsw = "yes"])
-AC_SUBST([SPEECHSW_CFLAGS])
-AC_SUBST([SPEECHSW_LIBS])
-AS_IF([test $with_speechsw = "yes"], [output_modules="${output_modules} speechsw"])
-
 # check for flite support
 AC_ARG_WITH([flite],
 	[AS_HELP_STRING([--with-flite], [include Festival Lite (Flite) support])],
@@ -340,6 +323,20 @@ fi
 AM_CONDITIONAL([kali_support], [test $with_kali != no])
 AM_CONDITIONAL([kali_shim], [test $with_kali = shim])
 AS_IF([test $with_kali != no], [output_modules="${output_modules} kali"])
+
+# check for speechsw support
+AC_ARG_WITH([speechsw],
+	[AS_HELP_STRING([--with-speechsw], [Compile with speechsw support])],
+	[],
+	[with_speechsw=check])
+AS_IF([test $with_speechsw != "no"],
+	[AC_CHECK_LIB([speechsw], [swSpeak],
+		[with_speechsw="yes"],
+		[AS_IF([test $with_speechsw = "yes"],
+			[AC_MSG_FAILURE([speechsw is not available])])],
+		[])])
+AM_CONDITIONAL([speechsw_support], [test $with_speechsw = "yes"])
+AS_IF([test $with_speechsw = "yes"], [output_modules="${output_modules} speechsw"])
 
 audio_dlopen_modules='-dlopen force'
 

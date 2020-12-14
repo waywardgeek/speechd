@@ -115,9 +115,9 @@ endif
 if speechsw_support
 modulebin_PROGRAMS += sd_speechsw
 sd_speechsw_SOURCES = speechsw.c $(audio_SOURCES) $(common_SOURCES) module_utils_speak_queue.c
-sd_espeak_LDADD = $(top_builddir)/src/common/libcommon.la \
+sd_speechsw_LDADD = $(top_builddir)/src/common/libcommon.la \
 	$(audio_dlopen_modules) \
-	$(SPEECHSW_LIBS)
+	-lspeechsw $(SPEECHSW_LIBS) \
 	$(common_LDADD)
 endif
 
