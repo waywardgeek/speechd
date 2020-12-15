@@ -51,7 +51,7 @@
 DECLARE_DEBUG()
 #define DBG_WARN(e, msg) do {            \
   if (Debug && !(e)) {            \
-    DBG(DBG_MODNAME " Warning:  " msg);      \
+    fprintf(dbg_file, "Warning:  " msg);      \
   } \
 } while (0)
 typedef enum {
@@ -60,6 +60,7 @@ typedef enum {
   ERROR = 1
 } TSpeechswSuccess;
 
+static FILE *dbg_file;
 static swEngine sw_engine = NULL;
 static uint32_t sw_sample_rate = 0;
 static char *sw_engine_name = NULL;
@@ -99,6 +100,8 @@ MOD_OPTION_1_STR(SpeechswPunctuationList)
 
 /* Public functions */
 int module_load(void) {
+  dbg_file = fopen("/tmp/speechsw.log", "w");
+  fprintf(dbg_file, "Called module_load\n");
   INIT_SETTINGS_TABLES();
 
   REGISTER_DEBUG();
@@ -122,6 +125,7 @@ int module_load(void) {
 
 // Find the path to lib/speechsw.
 static void set_directories(void) {
+  fprintf(dbg_file, "Called module_load\n");
   const char exe_link[] = "/proc/self/exe";
   /* First, get the path length. */
   char buf[1];
@@ -129,18 +133,37 @@ static void set_directories(void) {
   sw_exe_path = g_new0(char, path_len + 1);
   readlink(exe_link, sw_exe_path, path_len);
   sw_exe_path[path_len] = '\0';
-  DBG(DBG_MODNAME "Exe path: %s\n", sw_exe_path);
+  fprintf(dbg_file, "Exe path: %s\n", sw_exe_path);
   char *bin_dir = g_path_get_dirname(sw_exe_path);
   char *usr_dir = g_path_get_dirname(bin_dir);
   g_free(bin_dir);
   sw_lib_dir = swSprintf("%s/%s", usr_dir, "/lib/speechsw");
   g_free(usr_dir);
-  DBG(DBG_MODNAME "Lib dir: %s\n", sw_lib_dir);
+  fprintf(dbg_file, "Lib dir: %s\n", sw_lib_dir);
+}
+
+// Log a voice.
+static void log_voice(const SPDVoice *voice) {
+  fprintf(dbg_file, "voice->name = %s, voice->language = %s, voice->variant = %s\n",
+      voice->name, voice->language, voice->variant);
+}
+
+// Log the voices in sw_voice_list.
+static void log_voice_list(void) {
+  if (sw_voice_list == NULL) {
+    fprintf(dbg_file, "sw_voice_list is NULL.\n");
+    return;
+  }
+  for (SPDVoice **voice_ptr = sw_voice_list; *voice_ptr != NULL; voice_ptr++) {
+    SPDVoice *voice = *voice_ptr;
+    log_voice(voice);
+  }
 }
 
 // List voices from all engines and set sw_voice_list.  Concatenate the
 // engine name, then the voice.
 static void find_all_synthesis_voices(void) {
+  fprintf(dbg_file, "find_all_synthesis_voices called.\n");
   uint32_t allocated_voices = 42;
   sw_num_voices = 0;
   sw_voice_list = g_new0(SPDVoice*, allocated_voices);
@@ -178,17 +201,21 @@ static void find_all_synthesis_voices(void) {
     sw_voice_list = g_renew(SPDVoice*, sw_voice_list, allocated_voices);
   }
   sw_voice_list[sw_num_voices++] = NULL;
+  if (DEBUG_MODULE) {
+    log_voice_list();
+  }
 }
 
 int module_init(char **status_info) {
+  fprintf(dbg_file, "module_init_called.\n");
   sw_engine = NULL;
   set_directories();
   find_all_synthesis_voices();
-  DBG(DBG_MODNAME " Module init().");
+  fprintf(dbg_file, "Module init().");
   INIT_INDEX_MARKING();
   *status_info = NULL;
   /* Report versions. */
-  DBG(DBG_MODNAME " speechsw Output Module version %s, speechsw API version %u",
+  fprintf(dbg_file, "speechsw Output Module version %s, speechsw API version %u",
       MODULE_VERSION, SW_API_VERSION);
   if (sw_num_voices == 0) {
     // No backends function.
@@ -205,16 +232,18 @@ int module_init(char **status_info) {
 }
 
 SPDVoice **module_list_voices(void) {
+  fprintf(dbg_file, "module_list_voices called.\n");
   return sw_voice_list;
 }
 
 int module_speak(gchar * data, size_t bytes, SPDMessageType msgtype) {
+  fprintf(dbg_file, "Caleld module_speak\n");
   bool result = false;
-  DBG(DBG_MODNAME " module_speak().");
+  fprintf(dbg_file, "module_speak().");
   if (!module_speak_queue_before_synth()) {
     return FALSE;
   }
-  DBG(DBG_MODNAME " Requested data: |%s| %d %lu", data, msgtype,
+  fprintf(dbg_file, "Requested data: |%s| %d %lu", data, msgtype,
       (unsigned long)bytes);
   /* Setting speech parameters. */
   UPDATE_STRING_PARAMETER(voice.language, sw_set_language);
@@ -255,23 +284,24 @@ int module_speak(gchar * data, size_t bytes, SPDMessageType msgtype) {
     return FALSE;
   }
 
-  DBG(DBG_MODNAME " Leaving module_speak() normally.");
+  fprintf(dbg_file, "Leaving module_speak() normally.");
   return bytes;
 }
 
 int module_stop(void) {
-  DBG(DBG_MODNAME " module_stop().");
+  fprintf(dbg_file, "module_stop().");
   module_speak_queue_stop();
   return OK;
 }
 
 size_t module_pause(void) {
-  DBG(DBG_MODNAME " module_pause().");
+  fprintf(dbg_file, "module_pause().");
   module_speak_queue_pause();
   return OK;
 }
 
 void module_speak_queue_cancel(void) {
+  fprintf(dbg_file, "Caleld module_speak_queue_cancel\n");
   swCancel(sw_engine);
 }
 
@@ -289,10 +319,10 @@ static void sw_free_voice_list(void) {
   }
 }
 int module_close(void) {
-  DBG(DBG_MODNAME " close().");
-  DBG(DBG_MODNAME " Terminating threads");
+  fprintf(dbg_file, "close().");
+  fprintf(dbg_file, "Terminating threads");
   module_speak_queue_terminate();
-  DBG(DBG_MODNAME " terminating synthesis.");
+  fprintf(dbg_file, "terminating synthesis.");
   module_speak_queue_free();
   sw_free_voice_list();
   if (sw_engine != NULL) {
@@ -304,11 +334,13 @@ int module_close(void) {
   swFree(sw_voice_name);
   sw_voice_name = NULL;
   sw_sample_rate = 0;
+  fclose(dbg_file);
   return 0;
 }
 
 /* Internal functions */
 static void sw_set_rate(signed int rate) {
+  fprintf(dbg_file, "Caleld sw_set_rate\n");
   if (sw_engine == NULL) {
     return;
   }
@@ -322,17 +354,19 @@ static void sw_set_rate(signed int rate) {
     speed = 1.0f / (1.0f - rate/20.0f);
   }
   if (swSetSpeed(sw_engine, speed)) {
-    DBG(DBG_MODNAME " Speed set to %f.", speed);
+    fprintf(dbg_file, "Speed set to %f.", speed);
   } else {
-    DBG(DBG_MODNAME " Unable to set speed to %f.", speed);
+    fprintf(dbg_file, "Unable to set speed to %f.", speed);
   }
 }
 
 static void sw_set_volume(signed int volume) {
   // TODO: Should we support this?
+  fprintf(dbg_file, "Caleld sw_set_volume = %d\n", volume);
 }
 
 static void sw_set_pitch(signed int pitch) {
+  fprintf(dbg_file, "Caleld sw_set_pitch = %d\n", pitch);
   assert(pitch >= -100 && pitch <= +100);
   float rel_pitch = 1.0;
   if (pitch > 0) {
@@ -343,17 +377,19 @@ static void sw_set_pitch(signed int pitch) {
     rel_pitch = 1.0f / (1.0f - pitch/50.0f);
   }
   if (swSetPitch(sw_engine, rel_pitch)) {
-    DBG(DBG_MODNAME " Pitch set to %f.", rel_pitch);
+    fprintf(dbg_file, "Pitch set to %f.", rel_pitch);
   } else {
-    DBG(DBG_MODNAME " Unable to set pitch to %f.", rel_pitch);
+    fprintf(dbg_file, "Unable to set pitch to %f.", rel_pitch);
   }
 }
 
 static void sw_set_pitch_range(signed int pitch_range) {
   // We don't need this, I think.
+  fprintf(dbg_file, "Caleld sw_set_pitch_range = %d\n", pitch_range);
 }
 
 static void sw_set_punctuation_mode(SPDPunctuation punct_mode) {
+  fprintf(dbg_file, "Caleld sw_set_punctuation_mode = %d\n", punct_mode);
   swPunctuationLevel sw_punct_mode = SW_PUNCT_SOME;
   switch (punct_mode) {
   case SPD_PUNCT_ALL:
@@ -370,25 +406,26 @@ static void sw_set_punctuation_mode(SPDPunctuation punct_mode) {
     break;
   }
   if (swSetPunctuation(sw_engine, sw_punct_mode)) {
-    DBG(DBG_MODNAME " Punctuation level set to %u.", sw_punct_mode);
+    fprintf(dbg_file, "Punctuation level set to %u.", sw_punct_mode);
   } else {
-    DBG(DBG_MODNAME " Unable to set punctuation level set to %u.", sw_punct_mode);
+    fprintf(dbg_file, "Unable to set punctuation level set to %u.", sw_punct_mode);
   }
 }
 
 static void sw_set_cap_let_recogn(SPDCapitalLetters cap_mode) {
   // TODO: deal with this.
+  fprintf(dbg_file, "Caleld sw_set_cap_let_recogn = %d\n", cap_mode);
 }
 
 static void sw_set_voice(SPDVoiceType voice) {
   // TODO: Is this still called?
-  DBG(DBG_MODNAME " Called set_voice with voice code=%u\n", voice);
+  fprintf(dbg_file, "Called set_voice with voice code=%d\n", voice);
 }
 
 static void sw_set_language(char *lang) {
   // The language is set when setting the voice.
   // TODO: Is this still called?
-  DBG(DBG_MODNAME " Called set_lang with lange=%s\n", lang);
+  fprintf(dbg_file, "Called set_lang with lange=%s\n", lang);
 }
 
 // Find the voice by name from sw_voice_list;
@@ -425,9 +462,10 @@ static bool audio_callback(swEngine engine, int16_t *samples, uint32_t num_sampl
 // then the engine name.  Speech Switch expects the name in the form
 // "English (America),en-us", with a comma and then the language.
 static void sw_set_synthesis_voice(char *synthesis_voice) {
+  fprintf(dbg_file, "Called set_synthesis_voice with voice=%s\n", synthesis_voice);
   SPDVoice *voice = find_voice(synthesis_voice);
   if (voice == NULL) {
-    DBG(DBG_MODNAME " In sw_set_synthesis_voice: Unknown synthesis voice: %s\n", synthesis_voice);
+    fprintf(dbg_file, "In sw_set_synthesis_voice: Unknown synthesis voice: %s\n", synthesis_voice);
   }
   char *engine_name = swCopyString(voice->name);
   char *p = strchr(engine_name, ' ');
