@@ -165,6 +165,7 @@ static bool audio_callback(swEngine engine, int16_t *samples, uint32_t num_sampl
 static void set_rate(signed int rate) {
   LOG("Called set_rate with rate = %d\n", rate);
   if (sw_engine == NULL) {
+    LOG("No engine to set rate on.\n");
     return;
   }
   assert(rate >= -100 && rate <= +100);
@@ -191,6 +192,7 @@ static void set_volume(signed int volume) {
 static void set_pitch(signed int pitch) {
   LOG("Called set_pitch = %d\n", pitch);
   if (sw_engine == NULL) {
+    LOG("No engine to set pitch on.\n");
     return;
   }
   assert(pitch >= -100 && pitch <= +100);
@@ -217,6 +219,7 @@ static void set_pitch_range(signed int pitch_range) {
 static void set_punctuation_mode(SPDPunctuation punct_mode) {
   LOG("Called set_punctuation_mode = %d\n", punct_mode);
   if (sw_engine == NULL) {
+    LOG("No engine to set punctuation mode on.\n");
     return;
   }
   swPunctuationLevel sw_punct_mode = SW_PUNCT_SOME;
@@ -275,13 +278,10 @@ static void start_engine(const char *engine_name) {
   }
   sw_engine_name = swCopyString(engine_name);
   sw_sample_rate = swGetSampleRate(sw_engine);
-  if (sw_voice_name != NULL) {
-    swSetVoice(sw_engine, sw_voice_name);
-  }
-  set_rate(msg_settings.rate);
-  set_pitch(msg_settings.pitch);
-  set_punctuation_mode(msg_settings.punctuation_mode);
-  set_cap_let_recogn(msg_settings.cap_let_recogn);
+  // Looks like CLEAN_OLD_SETTINGS_TABLE does not free these.
+  g_free(msg_settings_old.voice.name);
+  g_free(msg_settings_old.voice.language);
+  CLEAN_OLD_SETTINGS_TABLE();
 }
 
 // Find the voice by name from sw_voice_list;
