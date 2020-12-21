@@ -27,13 +27,14 @@
  */
 
 /* System includes. */
-#include <string.h>
 #include <ctype.h>
 #include <glib.h>
 #include <pthread.h>
+#include <string.h>
 
 /* SpeechSwitch header file. */
 #include <speechsw/speechsw.h>
+#define SW_DEBUG 1  // Causes Speech Switch to call swLog for loging.
 #include <speechsw/util.h>
 
 /* Speech Dispatcher includes. */
@@ -50,18 +51,18 @@
 
 #define DEBUG_MODULE 1
 DECLARE_DEBUG()
-#define DBG_WARN(e, msg) do {            \
-  if (Debug && !(e)) {            \
-    LOG("Warning:  " msg);      \
+#define DBG_WARN(e, msg) do { \
+  if (Debug && !(e)) { \
+    LOG("Warning:  " msg); \
   } \
 } while (0)
+
 typedef enum {
   FATAL_ERROR = -1,
   OK = 0,
   ERROR = 1
 } TSpeechswSuccess;
 
-static FILE *dbg_file;
 static swEngine sw_engine = NULL;
 static uint32_t sw_sample_rate = 0;
 static char *sw_engine_name = NULL;
@@ -76,28 +77,16 @@ uint32_t sw_num_engines;
 static char *sw_exe_path;
 static char *sw_lib_dir;
 
-// Create a formatted string.  Caller is responsible for freeing result.
-void LOG(const char *format, ...) {
-  if (dbg_file == NULL) {
-    dbg_file = fopen("/tmp/speechsw.log", "w");
-  }
-  va_list ap;
-  va_start(ap, format);
-  vfprintf(dbg_file, format, ap);
-  va_end(ap);
-  fflush(dbg_file);
-}
-
 // Log a voice.
 static void log_voice(const SPDVoice *voice) {
-  LOG("voice->name = %s, voice->language = %s, voice->variant = %s\n",
+  swLog("voice->name = %s, voice->language = %s, voice->variant = %s\n",
       voice->name, voice->language, voice->variant);
 }
 
 // Log the voices in sw_voice_list.
 static void log_voice_list(void) {
   if (sw_voice_list == NULL) {
-    LOG("sw_voice_list is NULL.\n");
+    swLog("sw_voice_list is NULL.\n");
     return;
   }
   for (SPDVoice **voice_ptr = sw_voice_list; *voice_ptr != NULL; voice_ptr++) {
@@ -126,17 +115,17 @@ static bool audio_callback(swEngine engine, int16_t *samples, uint32_t num_sampl
     bool cancel, void *callbackContext) {
   if (cancel) {
     module_speak_queue_stop();
-    LOG("Canceling\n");
+    swLog("Canceling\n");
     return true;
   }
   if (module_speak_queue_stop_requested()) {
     sw_cancel = true;
-    LOG("Canceling\n");
+    swLog("Canceling\n");
     return true;
   }
   if (num_samples == 0) {
     // This indicates end of synthesis.
-    LOG("End of speech samples\n");
+    swLog("End of speech samples\n");
     module_speak_queue_before_play();
     module_speak_queue_add_end();
     return false;
@@ -148,24 +137,21 @@ static bool audio_callback(swEngine engine, int16_t *samples, uint32_t num_sampl
     .num_samples = num_samples,
     .samples = samples
   };
-  LOG("Speaking before play\n");
+  swLog("Speaking before play\n");
   module_speak_queue_before_play();
-  LOG("Sending %u samples to audio player\n", num_samples);
+  swLog("Sending %u samples to audio player\n", num_samples);
   if (!module_speak_queue_add_audio(&track, SPD_AUDIO_LE)) {
-    LOG("module_speak_queue_add_audio failed for some reason\n");
-    if (sw_engine) {
-      swCancel(sw_engine);
-    }
+    swLog("module_speak_queue_add_audio failed for some reason\n");
     return true;  // Causes current synthesis to end.
   }
-  LOG("Completed sending samples to audio player\n");
+  swLog("Completed sending samples to audio player\n");
   return sw_cancel;
 }
 
 static void set_rate(signed int rate) {
-  LOG("Called set_rate with rate = %d\n", rate);
+  swLog("Called set_rate with rate = %d\n", rate);
   if (sw_engine == NULL) {
-    LOG("No engine to set rate on.\n");
+    swLog("No engine to set rate on.\n");
     return;
   }
   assert(rate >= -100 && rate <= +100);
@@ -178,21 +164,21 @@ static void set_rate(signed int rate) {
     speed = 1.0f / (1.0f - rate/20.0f);
   }
   if (swSetSpeed(sw_engine, speed)) {
-    LOG("Speed set to %f.\n", speed);
+    swLog("Speed set to %f.\n", speed);
   } else {
-    LOG("Unable to set speed to %f.\n", speed);
+    swLog("Unable to set speed to %f.\n", speed);
   }
 }
 
 static void set_volume(signed int volume) {
   // TODO: Should we support this?
-  LOG("Called set_volume = %d\n", volume);
+  swLog("Called set_volume = %d\n", volume);
 }
 
 static void set_pitch(signed int pitch) {
-  LOG("Called set_pitch = %d\n", pitch);
+  swLog("Called set_pitch = %d\n", pitch);
   if (sw_engine == NULL) {
-    LOG("No engine to set pitch on.\n");
+    swLog("No engine to set pitch on.\n");
     return;
   }
   assert(pitch >= -100 && pitch <= +100);
@@ -205,21 +191,21 @@ static void set_pitch(signed int pitch) {
     rel_pitch = 1.0f / (1.0f - pitch/50.0f);
   }
   if (swSetPitch(sw_engine, rel_pitch)) {
-    LOG("Pitch set to %f.\n", rel_pitch);
+    swLog("Pitch set to %f.\n", rel_pitch);
   } else {
-    LOG("Unable to set pitch to %f.\n", rel_pitch);
+    swLog("Unable to set pitch to %f.\n", rel_pitch);
   }
 }
 
 static void set_pitch_range(signed int pitch_range) {
   // We don't need this, I think.
-  LOG("Called set_pitch_range = %d\n", pitch_range);
+  swLog("Called set_pitch_range = %d\n", pitch_range);
 }
 
 static void set_punctuation_mode(SPDPunctuation punct_mode) {
-  LOG("Called set_punctuation_mode = %d\n", punct_mode);
+  swLog("Called set_punctuation_mode = %d\n", punct_mode);
   if (sw_engine == NULL) {
-    LOG("No engine to set punctuation mode on.\n");
+    swLog("No engine to set punctuation mode on.\n");
     return;
   }
   swPunctuationLevel sw_punct_mode = SW_PUNCT_SOME;
@@ -238,26 +224,26 @@ static void set_punctuation_mode(SPDPunctuation punct_mode) {
     break;
   }
   if (swSetPunctuation(sw_engine, sw_punct_mode)) {
-    LOG("Punctuation level set to %u.\n", sw_punct_mode);
+    swLog("Punctuation level set to %u.\n", sw_punct_mode);
   } else {
-    LOG("Unable to set punctuation level set to %u.\n", sw_punct_mode);
+    swLog("Unable to set punctuation level set to %u.\n", sw_punct_mode);
   }
 }
 
 static void set_cap_let_recogn(SPDCapitalLetters cap_mode) {
   // TODO: deal with this.
-  LOG("Called set_cap_let_recogn = %d\n", cap_mode);
+  swLog("Called set_cap_let_recogn = %d\n", cap_mode);
 }
 
 static void set_voice(SPDVoiceType voice) {
   // TODO: Is this still called?
-  LOG("Called set_voice with voice code=%d\n", voice);
+  swLog("Called set_voice with voice code=%d\n", voice);
 }
 
 static void set_language(char *lang) {
   // The language is set when setting the voice.
   // TODO: Is this still called?
-  LOG("Called set_lang with lange=%s\n", lang);
+  swLog("Called set_lang with lange=%s\n", lang);
 }
 
 // Start the engine with the given name.
@@ -265,15 +251,15 @@ static void start_engine(const char *engine_name) {
   if (sw_engine != NULL) {
     if (!strcmp(engine_name, sw_engine_name)) {
       // Already started.
-      LOG("Engine %s already started\n", engine_name);
+      swLog("Engine %s already started\n", engine_name);
       return;
     }
     stop_engine();
   }
-  LOG("Starting engine %s\n", engine_name);
+  swLog("Starting engine %s\n", engine_name);
   sw_engine = swStart(sw_lib_dir, engine_name, audio_callback, NULL);
   if (sw_engine == NULL) {
-    LOG("Unable to start engine %s\n", engine_name);
+    swLog("Unable to start engine %s\n", engine_name);
     return;
   }
   sw_engine_name = swCopyString(engine_name);
@@ -300,10 +286,10 @@ static SPDVoice *find_voice(const char *synthesis_voice) {
 // then the engine name.  Speech Switch expects the name in the form
 // "English (America),en-us", with a comma and then the language.
 static void set_synthesis_voice(char *synthesis_voice) {
-  LOG("Called set_synthesis_voice with voice=%s\n", synthesis_voice);
+  swLog("Called set_synthesis_voice with voice=%s\n", synthesis_voice);
   SPDVoice *voice = find_voice(synthesis_voice);
   if (voice == NULL) {
-    LOG("In set_synthesis_voice: Unknown synthesis voice: %s\n", synthesis_voice);
+    swLog("In set_synthesis_voice: Unknown synthesis voice: %s\n", synthesis_voice);
     return;
   }
   char *engine_name = swCopyString(voice->name);
@@ -336,27 +322,27 @@ MOD_OPTION_1_STR(SpeechswPunctuationList)
 
 // Find the path to lib/speechsw.
 static void set_directories(void) {
-  LOG("Called set_directories\n");
+  swLog("Called set_directories\n");
   const char exe_link[] = "/proc/self/exe";
   /* First, get the path length. */
   char exe_path[1024 + 1];
   ssize_t path_len = readlink(exe_link, exe_path, sizeof(exe_path) - 1);
   exe_path[path_len] = '\0';
   sw_exe_path = swCopyString(exe_path);
-  LOG("Exe path: %s\n", sw_exe_path);
+  swLog("Exe path: %s\n", sw_exe_path);
   char *modules_dir = g_path_get_dirname(sw_exe_path);
   char *lib_exec_dir = g_path_get_dirname(modules_dir);
   g_free(modules_dir);
   sw_lib_dir = swCatStrings(lib_exec_dir, "/speechsw");
   g_free(lib_exec_dir);
-  LOG("lib dir: %s\n", sw_lib_dir);
+  swLog("lib dir: %s\n", sw_lib_dir);
 }
 
 // Select a default engine if none was set.
 static void set_default_engine(void) {
-  LOG("Setting default engine\n");
+  swLog("Setting default engine\n");
   if (sw_num_engines == 0) {
-    LOG("No engines found.\n");
+    swLog("No engines found.\n");
     return;
   }
   start_engine("espeak");
@@ -369,13 +355,28 @@ static void set_default_engine(void) {
       return;
     }
   }
-  LOG("All engines fail to start.\n");
+  swLog("All engines fail to start.\n");
+}
+
+// All backend engines report locale in lower case, e.g. en-us.  However, Orca
+// requires locale to be upper case, e.g. en-US.  Onvert everything after the -
+// to upper case for Orca.  Caller is responsible for freeing result.
+static char *capitalizeLocale(char *language) {
+  char *l = swCopyString(language);
+  char *p = strchr(l, '-');
+  if (p == NULL) {
+    return l;
+  }
+  while (*p != '\0') {
+    *p++ = toupper(*p);
+  }
+  return l;
 }
 
 // List voices from all engines and set sw_voice_list.  Concatenate the
 // engine name, then the voice.
 static void find_all_synthesis_voices(void) {
-  LOG("find_all_synthesis_voices called.\n");
+  swLog("find_all_synthesis_voices called.\n");
   uint32_t allocated_voices = 42;
   sw_num_voices = 0;
   sw_voice_list = g_new0(SPDVoice*, allocated_voices);
@@ -384,7 +385,7 @@ static void find_all_synthesis_voices(void) {
     const char *engine_name = sw_engines[i];
     swEngine engine = swStart(sw_lib_dir, engine_name, NULL, NULL);
     if (engine == NULL) {
-      LOG("Could not start %s\n", engine_name);
+      swLog("Could not start %s\n", engine_name);
     } else {
       uint32_t num_voices;
       char **voices = swListVoices(engine, &num_voices);
@@ -395,7 +396,7 @@ static void find_all_synthesis_voices(void) {
         *language++ = '\0';
         SPDVoice *voice = g_new0(SPDVoice, 1);
         voice->name = swSprintf("%s %s", engine_name, voice_name);
-        voice->language = swCopyString(language);
+        voice->language = capitalizeLocale(language);
         voice->variant = "null";
         if (sw_num_voices == allocated_voices) {
           allocated_voices <<= 1;
@@ -414,15 +415,14 @@ static void find_all_synthesis_voices(void) {
     sw_voice_list = g_renew(SPDVoice*, sw_voice_list, allocated_voices);
   }
   sw_voice_list[sw_num_voices++] = NULL;
-  if (DEBUG_MODULE) {
+  if (SW_DEBUG) {
     log_voice_list();
   }
-  fflush(dbg_file);
 }
 
 /* Public functions */
 int module_load(void) {
-  LOG("Called module_load\n");
+  swLog("Called module_load\n");
   set_directories();
   find_all_synthesis_voices();
   INIT_SETTINGS_TABLES();
@@ -447,11 +447,11 @@ int module_load(void) {
 }  
 
 int module_init(char **status_info) {
-  LOG("module_init_called.\n");
+  swLog("module_init_called.\n");
   INIT_INDEX_MARKING();
   *status_info = NULL;
   /* Report versions. */
-  LOG("speechsw Output Module version %s, speechsw API version %u\n",
+  swLog("speechsw Output Module version %s, speechsw API version %u\n",
       MODULE_VERSION, SW_API_VERSION);
   if (sw_num_voices == 0) {
     // No backends function.
@@ -468,24 +468,24 @@ int module_init(char **status_info) {
 }
 
 SPDVoice **module_list_voices(void) {
-  LOG("module_list_voices called.\n");
+  swLog("module_list_voices called.\n");
   return sw_voice_list;
 }
 
 static void speak(gchar * data, size_t bytes, SPDMessageType msgtype) {
-  LOG("Called speak\n");
+  swLog("Called speak\n");
   bool result = true;
   switch (msgtype) {
   case SPD_MSGTYPE_TEXT:
     data = module_strip_ssml(data);
-    LOG("SPEAK %s\n", data);
+    swLog("SPEAK %s\n", data);
     sw_cancel = false;
     result = swSpeak(sw_engine, data, true);
-    LOG("Sent '%s' to synthesizer speech\n", data);
+    swLog("Sent '%s' to synthesizer speech\n", data);
     break;
   case SPD_MSGTYPE_SOUND_ICON:
     // TODO: Play the icon.
-    LOG("Ignoring sound icon\n");
+    swLog("Ignoring sound icon\n");
     break;
   case SPD_MSGTYPE_CHAR: {
     char *utf8Char = data;
@@ -493,29 +493,29 @@ static void speak(gchar * data, size_t bytes, SPDMessageType msgtype) {
       utf8Char = " ";
     }
     sw_cancel = false;
-    LOG("Calling swSpeakChar with %s\n", utf8Char);
+    swLog("Calling swSpeakChar with %s\n", utf8Char);
     result = swSpeakChar(sw_engine, utf8Char, bytes);
-    LOG("Finished swSpeakCahr\n", utf8Char);
+    swLog("Finished swSpeakCahr\n", utf8Char);
     break;
   }
   case SPD_MSGTYPE_KEY: {
     // TODO: Convert unspeakable keys to speakable form.
     sw_cancel = false;
-    LOG("Calling swSpeak for key %s\n", data);
+    swLog("Calling swSpeak for key %s\n", data);
     result = swSpeak(sw_engine, data, true);
     break;
   }
   case SPD_MSGTYPE_SPELL:
     /* TODO: use a generic engine */
-    LOG("Ignoring spell message\n");
+    swLog("Ignoring spell message\n");
     break;
   default:
-    LOG("Ignoring event %u\n", msgtype);
+    swLog("Ignoring event %u\n", msgtype);
   }
   if (!result) {
-    LOG("Returning FALSE from speak.\n");
+    swLog("Returning FALSE from speak.\n");
   }
-  LOG("Leaving speak() normally.\n");
+  swLog("Leaving speak() normally.\n");
 }
 
 // These globals are used to pass parameters to module_speak to speak.
@@ -536,7 +536,8 @@ static pthread_t sw_speak_thread;
 // module_speak is required to return before speech is synthesized.  This
 // wrapper enables this, since swSpeak blocks.
 int module_speak(gchar *data, size_t bytes, SPDMessageType msgtype) {
-  LOG("Called module_speak.\n");
+  swLog("Called module_speak.\n");
+  module_speak_queue_before_synth();
   if (sw_speaking) {
     pthread_join(sw_speak_thread, NULL);
     sw_speaking = false;
@@ -546,13 +547,9 @@ int module_speak(gchar *data, size_t bytes, SPDMessageType msgtype) {
   if (sw_engine == NULL) {
     set_default_engine();
     if (sw_engine == NULL) {
-      LOG("No engine set\n");
+      swLog("No engine set\n");
       return FALSE;
     }
-  }
-  if (!module_speak_queue_before_synth()) {
-    LOG("module_speak_queue_before_sunth returned false.\n");
-    return FALSE;
   }
   // Set speech parameters.
   UPDATE_STRING_PARAMETER(voice.language, set_language);
@@ -576,24 +573,23 @@ int module_speak(gchar *data, size_t bytes, SPDMessageType msgtype) {
 }
 
 int module_stop(void) {
-  LOG("called module_stop\n");
+  swLog("called module_stop\n");
   module_speak_queue_stop();
   return OK;
 }
 
 size_t module_pause(void) {
-  LOG("module_pause().");
+  swLog("module_pause().");
   module_speak_queue_pause();
   return OK;
 }
 
 void module_speak_queue_cancel(void) {
-  LOG("Called module_speak_queue_cancel\n");
+  swLog("Called module_speak_queue_cancel\n");
   if (sw_engine == NULL) {
     return;
   }
   sw_cancel = true;
-  swCancel(sw_engine);
 }
 
 static void free_voice_list(void) {
@@ -611,17 +607,14 @@ static void free_voice_list(void) {
 }
 
 int module_close(void) {
-  LOG("called module_close\n");
+  swLog("called module_close\n");
   stop_engine();
   module_speak_queue_terminate();
-  LOG("terminating synthesis.");
+  swLog("terminating synthesis.");
   module_speak_queue_free();
   free_voice_list();
   swFreeStringList(sw_engines, sw_num_engines);
   sw_engines = NULL;
   sw_num_engines = 0;
-  if (dbg_file != NULL) {
-    fclose(dbg_file);
-  }
   return 0;
 }
