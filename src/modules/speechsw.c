@@ -69,7 +69,7 @@ static char *sw_engine_name = NULL;
 static char *sw_voice_name = NULL;
 static SPDVoice **sw_voice_list;
 static uint32_t sw_num_voices;
-static bool sw_cancel = false;
+static volatile bool sw_cancel = false;
 static char **sw_engines;
 uint32_t sw_num_engines;
 
@@ -113,7 +113,7 @@ static void stop_engine(void) {
 // speech engine.  Return true to cancel speech synthesis.
 static bool audio_callback(swEngine engine, int16_t *samples, uint32_t num_samples,
     bool cancel, void *callbackContext) {
-  if (cancel) {
+  if (cancel || sw_cancel) {
     module_speak_queue_stop();
     swLog("Canceling\n");
     return true;
@@ -574,6 +574,9 @@ int module_speak(gchar *data, size_t bytes, SPDMessageType msgtype) {
 
 int module_stop(void) {
   swLog("called module_stop\n");
+  if (sw_engine != NULL) {
+    sw_cancel = true;
+  }
   module_speak_queue_stop();
   return OK;
 }
@@ -586,10 +589,9 @@ size_t module_pause(void) {
 
 void module_speak_queue_cancel(void) {
   swLog("Called module_speak_queue_cancel\n");
-  if (sw_engine == NULL) {
-    return;
+  if (sw_engine != NULL) {
+    sw_cancel = true;
   }
-  sw_cancel = true;
 }
 
 static void free_voice_list(void) {
