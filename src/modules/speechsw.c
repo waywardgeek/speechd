@@ -472,24 +472,33 @@ SPDVoice **module_list_voices(void) {
   return sw_voice_list;
 }
 
-static void speak(gchar * data, size_t bytes, SPDMessageType msgtype) {
+static void speak(char *data, size_t bytes, SPDMessageType msgtype) {
+  // Oddly, data appears to not be zero-terminated, so make a copy and terminate it.
+  char *text = NULL;
+  if (bytes != 0) {
+    text = swCalloc(bytes + 1, sizeof(char));
+  }
+  memcpy(text, data, bytes);
+  text[bytes] = '\0';
   swLog("Called speak\n");
   bool result = true;
   switch (msgtype) {
-  case SPD_MSGTYPE_TEXT:
-    data = module_strip_ssml(data);
-    swLog("SPEAK %s\n", data);
+  case SPD_MSGTYPE_TEXT: {
+    char *out = module_strip_ssml(text);
+    swLog("SPEAK %s\n", out);
     sw_cancel = false;
-    result = swSpeak(sw_engine, data, true);
-    swLog("Sent '%s' to synthesizer speech\n", data);
+    result = swSpeak(sw_engine, out, true);
+    swLog("Sent '%s' to synthesizer speech\n", out);
+    swFree(out);
     break;
+  }
   case SPD_MSGTYPE_SOUND_ICON:
     // TODO: Play the icon.
     swLog("Ignoring sound icon\n");
     break;
   case SPD_MSGTYPE_CHAR: {
-    char *utf8Char = data;
-    if (bytes == 5 && !strncmp(data, "space", bytes)) {
+    char *utf8Char = text;
+    if (bytes == 5 && !strncmp(text, "space", bytes)) {
       utf8Char = " ";
     }
     sw_cancel = false;
@@ -501,8 +510,8 @@ static void speak(gchar * data, size_t bytes, SPDMessageType msgtype) {
   case SPD_MSGTYPE_KEY: {
     // TODO: Convert unspeakable keys to speakable form.
     sw_cancel = false;
-    swLog("Calling swSpeak for key %s\n", data);
-    result = swSpeak(sw_engine, data, true);
+    swLog("Calling swSpeak for key %s\n", text);
+    result = swSpeak(sw_engine, text, true);
     break;
   }
   case SPD_MSGTYPE_SPELL:
@@ -515,11 +524,12 @@ static void speak(gchar * data, size_t bytes, SPDMessageType msgtype) {
   if (!result) {
     swLog("Returning FALSE from speak.\n");
   }
+  swFree(text);
   swLog("Leaving speak() normally.\n");
 }
 
 // These globals are used to pass parameters to module_speak to speak.
-static gchar *sw_speak_data;
+static char *sw_speak_data;
 static size_t sw_speak_bytes;
 static SPDMessageType sw_speak_msgtype;
 
@@ -535,7 +545,7 @@ static pthread_t sw_speak_thread;
 
 // module_speak is required to return before speech is synthesized.  This
 // wrapper enables this, since swSpeak blocks.
-int module_speak(gchar *data, size_t bytes, SPDMessageType msgtype) {
+int module_speak(char *data, size_t bytes, SPDMessageType msgtype) {
   swLog("Called module_speak.\n");
   module_speak_queue_before_synth();
   if (sw_speaking) {
@@ -561,7 +571,7 @@ int module_speak(gchar *data, size_t bytes, SPDMessageType msgtype) {
   UPDATE_PARAMETER(punctuation_mode, set_punctuation_mode);
   UPDATE_PARAMETER(cap_let_recogn, set_cap_let_recogn);
   // Pass parameters to speak thread through globals.
-  sw_speak_data = swCalloc(bytes, sizeof(gchar));
+  sw_speak_data = swCalloc(bytes, sizeof(char));
   memcpy(sw_speak_data, data, bytes);
   sw_speak_bytes = bytes;
   sw_speak_msgtype = msgtype;
