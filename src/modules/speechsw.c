@@ -184,11 +184,11 @@ static void set_pitch(signed int pitch) {
   assert(pitch >= -100 && pitch <= +100);
   float rel_pitch = 1.0;
   if (pitch > 0) {
-    // 0 = 1.0, 50 = 2.0, 100 = 3.0.
-    rel_pitch = 1.0f + pitch/50.0f;
+    // 0 = 1.0, 100 = 1.5.
+    rel_pitch = 1.0f + pitch/200.0f;
   } else if (pitch < 0) {
-    // 0 = 1.0, -50 = 1/2, -100 = 1/3.
-    rel_pitch = 1.0f / (1.0f - pitch/50.0f);
+    // 0 = 1.0, -100 = 1/1.5.
+    rel_pitch = 1.0f / (1.0f - pitch/200.0f);
   }
   if (swSetPitch(sw_engine, rel_pitch)) {
     swLog("Pitch set to %f.\n", rel_pitch);
